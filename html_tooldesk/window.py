@@ -224,21 +224,36 @@ class MainWindow(QMainWindow):
             self._capture_view_storage(self.active_id, self._view_cache[self.active_id])
 
     def _forget_view(self, tool_id: str) -> None:
-        """Release an inactive cached page while retaining data on disk."""
+        """Capture the outgoing HTML state before releasing an evicted page."""
         view = self._view_cache.pop(tool_id, None)
-        self._view_paths.pop(tool_id, None)
         if tool_id in self._view_order:
             self._view_order.remove(tool_id)
         if view is None:
+            self._view_paths.pop(tool_id, None)
             return
         if view is self.browser:
             self.browser = None
             self.page = None
         if self.stack.currentWidget() is view:
             self.stack.setCurrentWidget(self.welcome)
-        view.stop()
-        self.stack.removeWidget(view)
-        view.deleteLater()
+
+        disposed = {"done": False}
+
+        def dispose():
+            if disposed["done"]:
+                return
+            disposed["done"] = True
+            self._view_paths.pop(tool_id, None)
+            try:
+                view.stop()
+                self.stack.removeWidget(view)
+                view.deleteLater()
+            except RuntimeError:
+                pass
+
+        # Javascript is asynchronous; do not stop the renderer before its snapshot.
+        self._capture_view_storage(tool_id, view, dispose)
+        QTimer.singleShot(900, dispose)
 
     def _get_view_for_tool(self, tool_id: str):
         """LRU cache: revisiting up to three tools does not reload HTML/JavaScript."""
