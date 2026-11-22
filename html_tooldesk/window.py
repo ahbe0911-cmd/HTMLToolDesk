@@ -413,22 +413,36 @@ class MainWindow(QMainWindow):
         if not Path(tool.path).is_file():
             self.welcome.show_error(tool.path)
             self.stack.setCurrentWidget(self.welcome)
-            QMessageBox.warning(self, "فایل پیدا نشد", "فایل HTML مربوط به این ابزار در مسیر ثبت‌شده پیدا نشد.\nاز منوی راست‌کلیک، مسیر آن را اصلاح کنید.")
+            QMessageBox.warning(
+                self, "فایل پیدا نشد",
+                "فایل HTML مربوط به این ابزار در مسیر ثبت‌شده پیدا نشد.\n"
+                "از منوی راست‌کلیک، مسیر آن را اصلاح کنید."
+            )
             return
+
         path = str(Path(tool.path).resolve())
-        if (self.browser is not None and self.stack.currentWidget() == self.browser
-                and self._loaded_tool_path == path):
-            return
         try:
             self._ensure_browser()
+            view = self._get_view_for_tool(tool.id)
         except Exception as exc:
             self.welcome.show_error(str(exc))
             self.stack.setCurrentWidget(self.welcome)
             QMessageBox.critical(self, "خطای نمایش", f"نمایشگر HTML راه‌اندازی نشد:\n{exc}")
             return
-        self.stack.setCurrentWidget(self.browser)
+
+        # Switching to an already-loaded page is immediate and keeps HTML state.
+        self.browser = view
+        self.page = view.page()
+        self.stack.setCurrentWidget(view)
+        if self._view_paths.get(tool.id) == path:
+            self.loading_label.hide()
+            return
+
+        self._view_paths[tool.id] = path
         self._loaded_tool_path = path
-        self.browser.load(QUrl.fromLocalFile(path))
+        self.loading_label.setText("در حال بارگذاری…")
+        self.loading_label.show()
+        view.load(QUrl.fromLocalFile(path))
 
     def clear_selection(self) -> None:
         self.active_id = None
@@ -438,9 +452,8 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(self.welcome)
         self.list_widget.clearSelection()
         self._update_view_buttons()
-        self._loaded_tool_path = None
-        if self.browser is not None:
-            self.browser.setUrl(QUrl("about:blank"))
+        self.loading_label.hide()
+        # Do not unload cached pages: revisit without another Chromium reload.
 
     def add_tool(self) -> None:
         dialog = ToolDialog(self)
@@ -499,6 +512,7 @@ class MainWindow(QMainWindow):
             return
         if self.active_id == tool_id:
             self.clear_selection()
+        self._forget_view(tool_id)
         self.populate_tools()
 
     def move_item(self, tool_id: str, offset: int) -> None:
@@ -559,6 +573,7 @@ class MainWindow(QMainWindow):
             self.populate_tools()
 
     def reload_current(self) -> None:
+        """Explicit refresh reloads the selected file; regular clicks do not."""
         if not self.active_id:
             return
         tool = self.find_tool(self.active_id)
@@ -566,10 +581,18 @@ class MainWindow(QMainWindow):
             return
         if not Path(tool.path).is_file():
             self.show_tool(tool)
-        else:
-            self._ensure_browser()
-            self.stack.setCurrentWidget(self.browser)
-            self.browser.load(QUrl.fromLocalFile(str(Path(tool.path).resolve())))
+            return
+        if self.active_id not in self._view_cache:
+            self.show_tool(tool)
+            return
+        view = self._view_cache[self.active_id]
+        self.browser, self.page = view, view.page()
+        self.stack.setCurrentWidget(view)
+        path = str(Path(tool.path).resolve())
+        self._view_paths[self.active_id] = path
+        self.loading_label.setText("در حال بارگذاری مجدد…")
+        self.loading_label.show()
+        view.load(QUrl.fromLocalFile(path))
 
     def open_external(self) -> None:
         if self.active_path and Path(self.active_path).is_file():
@@ -578,20 +601,21 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "باز کردن مرورگر", "سیستم نتوانست مرورگر پیش‌فرض را باز کند.")
 
     def on_load_finished(self, ok: bool) -> None:
-        # Chromium can report failed/cancelled loads while the user switches tools.
-        # Keep the viewport visible instead of replacing an in-flight page.
+        # Inactive cached HTML pages can finish after switching; never disturb UI.
+        if self.sender() is not self.browser or self.stack.currentWidget() is not self.browser:
+            return
         self.loading_label.hide()
-        if not ok and self.browser is not None and self.stack.currentWidget() == self.browser:
-            self._loaded_tool_path = None
+        if not ok and self.active_id:
+            self._view_paths.pop(self.active_id, None)
             self.loading_label.setText("بارگذاری ناموفق؛ دوباره تلاش کنید")
             self.loading_label.show()
 
-    def handle_new_window(self, request) -> None:
-        """Never create tabs or external windows from embedded HTML navigation."""
+    def handle_new_window(self, request, owner=None) -> None:
+        """Use the originating viewport instead of opening an external window."""
         url = request.requestedUrl()
-        if self.browser is not None and url.isValid() and url.scheme() in ("file", "http", "https"):
-            # target=_blank links are redirected into the same permanent viewport.
-            self.browser.load(url)
+        target = owner if owner is not None else self.browser
+        if target is not None and url.isValid() and url.scheme() in ("file", "http", "https"):
+            target.load(url)
 
     def handle_download(self, download) -> None:
         suggested = download.downloadFileName()
