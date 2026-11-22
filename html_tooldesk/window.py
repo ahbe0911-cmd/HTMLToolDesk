@@ -119,7 +119,7 @@ class MainWindow(QMainWindow):
         self.date_timer.start()
         # No Chromium work on startup: the welcome screen must never freeze.
         self.snapshot_timer = QTimer(self)
-        self.snapshot_timer.setInterval(1800)
+        self.snapshot_timer.setInterval(5000)
         self.snapshot_timer.timeout.connect(self.capture_active_storage)
         self.snapshot_timer.start()
         if store.warning:
