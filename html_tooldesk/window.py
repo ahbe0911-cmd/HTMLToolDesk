@@ -166,6 +166,55 @@ class MainWindow(QMainWindow):
         )
         return view
 
+    def _install_restore_script(self, tool_id: str, path: str, view) -> None:
+        """Restore native snapshots before the HTML's own initialization JS runs."""
+        from PyQt6.QtWebEngineCore import QWebEngineScript
+
+        snapshot = read_snapshot(tool_id, path)
+        collection = view.page().scripts()
+        collection.clear()
+        if not snapshot:
+            return
+        script = QWebEngineScript()
+        script.setName("HTMLToolDeskStorageRecovery")
+        script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
+        script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+        script.setRunsOnSubFrames(False)
+        script.setSourceCode(restore_script(snapshot))
+        collection.insert(script)
+
+    def _capture_view_storage(self, tool_id: str, view, finished=None) -> None:
+        """Request a small, asynchronous snapshot; never block Qt's GUI event loop."""
+        path = self._view_paths.get(tool_id)
+        try:
+            if not path or not hasattr(view, "page"):
+                if finished:
+                    finished()
+                return
+            page = view.page()
+            url = page.url()
+            if not url.isLocalFile() or Path(url.toLocalFile()).resolve() != Path(path).resolve():
+                if finished:
+                    finished()
+                return
+
+            def received(data):
+                try:
+                    save_snapshot(tool_id, path, data)
+                finally:
+                    if finished:
+                        finished()
+
+            page.runJavaScript(CAPTURE_SCRIPT, received)
+        except (RuntimeError, AttributeError, OSError):
+            if finished:
+                finished()
+
+    def capture_active_storage(self) -> None:
+        """Periodic crash-resistant mirror of local/session storage after HTML changes."""
+        if self.active_id and self.active_id in self._view_cache:
+            self._capture_view_storage(self.active_id, self._view_cache[self.active_id])
+
     def _forget_view(self, tool_id: str) -> None:
         """Release an inactive cached page while retaining data on disk."""
         view = self._view_cache.pop(tool_id, None)
@@ -471,6 +520,8 @@ class MainWindow(QMainWindow):
             self.show_tool(tool)
 
     def show_tool(self, tool: Tool) -> None:
+        if self.active_id and self.active_id != tool.id:
+            self.capture_active_storage()
         self.active_id = tool.id
         self.active_path = tool.path
         self.viewport_title.setText(tool.title)
@@ -508,6 +559,7 @@ class MainWindow(QMainWindow):
         self._loaded_tool_path = path
         self.loading_label.setText("در حال بارگذاری…")
         self.loading_label.show()
+        self._install_restore_script(tool.id, path, view)
         view.load(QUrl.fromLocalFile(path))
 
     def clear_selection(self) -> None:
@@ -657,6 +709,7 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(view)
         path = str(Path(tool.path).resolve())
         self._view_paths[self.active_id] = path
+        self._install_restore_script(self.active_id, path, view)
         self.loading_label.setText("در حال بارگذاری مجدد…")
         self.loading_label.show()
         view.load(QUrl.fromLocalFile(path))
@@ -672,6 +725,8 @@ class MainWindow(QMainWindow):
         if self.sender() is not self.browser or self.stack.currentWidget() is not self.browser:
             return
         self.loading_label.hide()
+        if ok and self.active_id:
+            self.capture_active_storage()
         if not ok and self.active_id:
             self._view_paths.pop(self.active_id, None)
             self.loading_label.setText("بارگذاری ناموفق؛ دوباره تلاش کنید")
