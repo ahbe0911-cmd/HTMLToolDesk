@@ -1,7 +1,9 @@
 """Pure-Python tests; PyQt6 is not required to run these tests."""
 import json
+import os
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from html_tooldesk.models import Tool
@@ -40,6 +42,45 @@ class TestStore(unittest.TestCase):
         item = Tool.create("كاربردي", "test.html")
         self.assertTrue(item.matches("کاربردی"))
         self.assertFalse(item.matches("فهرست"))
+
+
+    def test_default_config_stays_in_appdata_after_executable_moves(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            appdata = root / "appdata"
+            old_exe = root / "old-version"
+            new_exe = root / "new-version"
+            old_exe.mkdir()
+            new_exe.mkdir()
+            with patch.dict(os.environ, {"LOCALAPPDATA": str(appdata)}):
+                with patch("html_tooldesk.storage.executable_directory", return_value=old_exe):
+                    first = Store()
+                    first.with_items([Tool.create("ابزار ماندگار", str(root / "first.html"))])
+                with patch("html_tooldesk.storage.executable_directory", return_value=new_exe):
+                    second = Store()
+                    self.assertEqual([x.title for x in second.state.items], ["ابزار ماندگار"])
+                    self.assertEqual(second.path, appdata / "HTMLToolDesk" / "config.json")
+                    self.assertFalse((new_exe / "config.json").exists())
+
+    def test_migrates_older_exe_side_config_once(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            appdata = root / "appdata"
+            portable = root / "previous"
+            portable.mkdir()
+            legacy = portable / "config.json"
+            legacy.write_text(json.dumps({"tools": [
+                {"id": "older", "title": "ابزار قدیمی", "path": "C:/tools/old.html"}
+            ], "theme": "light"}), encoding="utf-8")
+            with patch.dict(os.environ, {"LOCALAPPDATA": str(appdata)}):
+                with patch("html_tooldesk.storage.executable_directory", return_value=portable):
+                    first = Store()
+                    self.assertEqual(first.state.items[0].title, "ابزار قدیمی")
+                    first.with_items([Tool.create("ابزار جدید", "C:/tools/new.html")])
+                    second = Store()
+                    self.assertEqual(second.state.items[0].title, "ابزار جدید")
+                    self.assertEqual(len(second.state.items), 1)
+                    self.assertTrue(legacy.exists())
 
 
 if __name__ == "__main__":
