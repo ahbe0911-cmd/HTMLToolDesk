@@ -3,10 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QUrl, QTimer
+from PyQt6.QtCore import Qt, QUrl, QTimer, QSize
 from PyQt6.QtGui import QDesktopServices, QKeySequence, QShortcut
-from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineSettings
-from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import (
     QApplication, QAbstractItemView, QDialog, QFileDialog, QFrame, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMenu,
@@ -18,6 +16,7 @@ from .dialogs import ToolDialog
 from .models import Tool
 from .storage import Store, user_data_directory
 from .theme import stylesheet
+from .icons import icon, tool_icon
 
 ROLE_ID = Qt.ItemDataRole.UserRole
 
@@ -72,7 +71,10 @@ class MainWindow(QMainWindow):
         self.active_path: str | None = None
         self._rebuilding = False
         self._last_sidebar_width = store.state.sidebar_width
-        self._configure_webengine()
+        self.browser = None
+        self.profile = None
+        self.page = None
+        self._loaded_tool_path = None
         self._build_ui()
         self.apply_theme()
         self.populate_tools()
@@ -86,25 +88,40 @@ class MainWindow(QMainWindow):
         if store.warning:
             QTimer.singleShot(0, lambda: QMessageBox.warning(self, "بازیابی تنظیمات", store.warning))
 
-    def _configure_webengine(self) -> None:
-        """Named profile and explicit paths make localStorage persistent across runs."""
+    def _ensure_browser(self) -> None:
+        """Lazily initialize Chromium once; reuse the same page for every HTML tool."""
+        if self.browser is not None:
+            return
+        from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineSettings
+        from PyQt6.QtWebEngineWidgets import QWebEngineView
+
         storage_root = user_data_directory()
         (storage_root / "web_profile").mkdir(parents=True, exist_ok=True)
         (storage_root / "web_cache").mkdir(parents=True, exist_ok=True)
-        self.profile = QWebEngineProfile("HTMLToolDesk", self)
-        self.profile.setPersistentStoragePath(str(storage_root / "web_profile"))
-        self.profile.setCachePath(str(storage_root / "web_cache"))
-        self.profile.setPersistentCookiesPolicy(
+        profile = QWebEngineProfile("HTMLToolDesk", self)
+        profile.setPersistentStoragePath(str(storage_root / "web_profile"))
+        profile.setCachePath(str(storage_root / "web_cache"))
+        profile.setPersistentCookiesPolicy(
             QWebEngineProfile.PersistentCookiesPolicy.AllowPersistentCookies
         )
-        settings = self.profile.settings()
+        settings = profile.settings()
         settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
         settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)
         settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
-        # Remote URLs accessed directly from local HTML may be needed for external CDNs.
-        # Add only files you trust, as they may execute JavaScript with local file access.
         settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
-        self.profile.downloadRequested.connect(self.handle_download)
+        settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
+        browser = QWebEngineView(self.stack)
+        page = QWebEnginePage(profile, browser)
+        browser.setPage(page)
+        browser.loadStarted.connect(self.on_load_started)
+        browser.loadFinished.connect(self.on_load_finished)
+        page.newWindowRequested.connect(self.handle_new_window)
+        profile.downloadRequested.connect(self.handle_download)
+        self.profile, self.page, self.browser = profile, page, browser
+        self.stack.addWidget(browser)
+
+    def on_load_started(self) -> None:
+        self.loading_label.show()
 
     def _build_ui(self) -> None:
         root = QWidget()
@@ -142,19 +159,17 @@ class MainWindow(QMainWindow):
         self.reload_button = self._button("↻", "بارگذاری مجدد (F5)", self.reload_current)
         self.open_button = self._button("↗", "باز کردن در مرورگر ویندوز", self.open_external)
         self.theme_button = self._button("☀", "تغییر تم روشن/تاریک", self.toggle_theme)
+        self.loading_label = QLabel("در حال بارگذاری…")
+        self.loading_label.setObjectName("MutedText")
+        self.loading_label.hide()
+        top_layout.addWidget(self.loading_label)
         for button in (self.reload_button, self.open_button, self.theme_button):
             top_layout.addWidget(button)
         viewport_layout.addWidget(toolbar)
 
         self.stack = QStackedWidget()
         self.welcome = WelcomePanel()
-        self.browser = QWebEngineView()
-        self.page = QWebEnginePage(self.profile, self.browser)
-        self.browser.setPage(self.page)
-        self.browser.loadFinished.connect(self.on_load_finished)
-        self.page.newWindowRequested.connect(self.handle_new_window)
         self.stack.addWidget(self.welcome)
-        self.stack.addWidget(self.browser)
         viewport_layout.addWidget(self.stack, stretch=1)
         self.splitter.addWidget(self.main_area)
 
@@ -297,8 +312,20 @@ class MainWindow(QMainWindow):
             self.stack.setCurrentWidget(self.welcome)
             QMessageBox.warning(self, "فایل پیدا نشد", "فایل HTML مربوط به این ابزار در مسیر ثبت‌شده پیدا نشد.\nاز منوی راست‌کلیک، مسیر آن را اصلاح کنید.")
             return
+        path = str(Path(tool.path).resolve())
+        if (self.browser is not None and self.stack.currentWidget() == self.browser
+                and self._loaded_tool_path == path):
+            return
+        try:
+            self._ensure_browser()
+        except Exception as exc:
+            self.welcome.show_error(str(exc))
+            self.stack.setCurrentWidget(self.welcome)
+            QMessageBox.critical(self, "خطای نمایش", f"نمایشگر HTML راه‌اندازی نشد:\n{exc}")
+            return
         self.stack.setCurrentWidget(self.browser)
-        self.browser.load(QUrl.fromLocalFile(str(Path(tool.path).resolve())))
+        self._loaded_tool_path = path
+        self.browser.load(QUrl.fromLocalFile(path))
 
     def clear_selection(self) -> None:
         self.active_id = None
@@ -308,7 +335,9 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(self.welcome)
         self.list_widget.clearSelection()
         self._update_view_buttons()
-        self.browser.setUrl(QUrl("about:blank"))
+        self._loaded_tool_path = None
+        if self.browser is not None:
+            self.browser.setUrl(QUrl("about:blank"))
 
     def add_tool(self) -> None:
         dialog = ToolDialog(self)
@@ -435,9 +464,9 @@ class MainWindow(QMainWindow):
         if not Path(tool.path).is_file():
             self.show_tool(tool)
         else:
+            self._ensure_browser()
             self.stack.setCurrentWidget(self.browser)
-            # Re-load original file even if the page navigated to another URL.
-            self.browser.load(QUrl.fromLocalFile(tool.path))
+            self.browser.load(QUrl.fromLocalFile(str(Path(tool.path).resolve())))
 
     def open_external(self) -> None:
         if self.active_path and Path(self.active_path).is_file():
@@ -446,14 +475,16 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "باز کردن مرورگر", "سیستم نتوانست مرورگر پیش‌فرض را باز کند.")
 
     def on_load_finished(self, ok: bool) -> None:
-        if not ok and self.stack.currentWidget() == self.browser:
+        self.loading_label.hide()
+        if not ok and self.browser is not None and self.stack.currentWidget() == self.browser:
+            self._loaded_tool_path = None
             self.welcome.show_error("نمایش این صفحه با خطا روبه‌رو شد. فایل و منابع وابسته به آن را بررسی کنید.")
             self.stack.setCurrentWidget(self.welcome)
 
     def handle_new_window(self, request) -> None:
-        # target="_blank" links open in the user's default browser.
-        if request.requestedUrl().isValid():
-            QDesktopServices.openUrl(request.requestedUrl())
+        # Even target=_blank and window.open are routed into the existing view.
+        if self.page is not None:
+            request.openIn(self.page)
 
     def handle_download(self, download) -> None:
         suggested = download.downloadFileName()
