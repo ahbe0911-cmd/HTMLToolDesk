@@ -26,6 +26,7 @@ def child(mode: str, base: Path) -> int:
     import html_tooldesk.window as window_module
     import html_tooldesk.web_state as state_module
 
+    print(f"Qt WebEngine child phase={mode}, Python={sys.version}", flush=True)
     appdata = base / "appdata"
     window_module.user_data_directory = lambda: appdata
     state_module.user_data_directory = lambda: appdata
@@ -43,6 +44,7 @@ def child(mode: str, base: Path) -> int:
 
     app = create_application([])
     win = window_module.MainWindow(Store(config))
+    print("MainWindow created", flush=True)
     win.show()
     outcome = {"ok": False, "error": "timeout"}
     fired = {"value": False}
@@ -118,7 +120,12 @@ def main() -> int:
             result = subprocess.run(
                 [sys.executable, __file__, phase, tmp],
                 env=env, timeout=35, check=False,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                errors="replace",
             )
+            print("WebEngine child return code:", result.returncode, flush=True)
+            print("WebEngine stdout:", result.stdout[-4000:], flush=True)
+            print("WebEngine stderr:", result.stderr[-4000:], flush=True)
             if result.returncode != 0:
                 return result.returncode
         print("Two-process HTML backup recovery validated.", flush=True)
