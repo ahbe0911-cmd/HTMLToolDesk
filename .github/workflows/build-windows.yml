@@ -34,6 +34,12 @@ jobs:
       - name: Test persistence layer
         shell: pwsh
         run: python -m unittest discover -s tests -v
+      - name: Test live HTML backup across two Windows process launches
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:QTWEBENGINE_CHROMIUM_FLAGS = "--disable-gpu --no-sandbox"
+          python scripts/verify_webengine_persistence.py
       - name: Build portable EXE
         shell: pwsh
         run: python -m PyInstaller --clean --noconfirm HTMLToolDesk.spec
