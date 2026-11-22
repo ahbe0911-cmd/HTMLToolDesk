@@ -115,6 +115,13 @@ class TestMainWindow(unittest.TestCase):
                 self.assertNotEqual(bg, border)
                 self.assertNotEqual(border, accent)
                 self.assertIsNone(window.browser, "Chromium should be lazy-loaded")
+                self.assertIsNone(window.profile, "No Chromium profile should be created at startup")
+                self.assertIn("روی ابزار موردنظر", window.welcome.message.text())
+                self.assertEqual(window.welcome.arrow.text(), "↗")
+                # Even after Qt processes startup events, no WebEngine preload may run.
+                from PyQt6.QtTest import QTest
+                QTest.qWait(600)
+                self.assertIsNone(window.profile, "No hidden background Chromium warm-up")
                 self.assertEqual(window.splitter.widget(1), window.sidebar)
                 window.search.setText("دوم")
                 self.assertEqual(window.list_widget.count(), 1)
