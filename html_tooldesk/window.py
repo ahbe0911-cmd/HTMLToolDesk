@@ -30,13 +30,13 @@ class WelcomePanel(QWidget):
 
         card = QWidget()
         card.setObjectName("WelcomeCard")
-        card.setMaximumWidth(650)
+        card.setMaximumWidth(530)
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(45, 48, 45, 48)
-        layout.setSpacing(16)
+        layout.setContentsMargins(30, 32, 30, 32)
+        layout.setSpacing(11)
 
         emblem = QLabel()
-        emblem.setPixmap(icon("grid", "#626EFF", 44).pixmap(44, 44))
+        emblem.setPixmap(icon("grid", "#626EFF", 32).pixmap(32, 32))
         emblem.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(emblem)
         logo = QLabel("HTML  /  TOOL DESK")
@@ -83,9 +83,9 @@ class MainWindow(QMainWindow):
         self.apply_theme()
         self.populate_tools()
         self.setWindowTitle("میزکار ابزارهای HTML | HTMLToolDesk")
-        self.resize(1350, 860)
+        self.resize(1320, 790)
         self.setMinimumSize(840, 520)
-        self.splitter.setSizes([1000, store.state.sidebar_width])
+        self.splitter.setSizes([1050, min(store.state.sidebar_width, 256)])
         QShortcut(QKeySequence("Ctrl+N"), self, self.add_tool)
         QShortcut(QKeySequence("Ctrl+F"), self, self.focus_search)
         QShortcut(QKeySequence("F5"), self, self.reload_current)
@@ -139,20 +139,20 @@ class MainWindow(QMainWindow):
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         # Force viewport on the left and the sidebar on the right, independently of RTL.
         self.splitter.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
-        self.splitter.setHandleWidth(5)
+        self.splitter.setHandleWidth(3)
         outer.addWidget(self.splitter)
 
         self.main_area = QWidget()
         self.main_area.setObjectName("MainArea")
         viewport_layout = QVBoxLayout(self.main_area)
-        viewport_layout.setContentsMargins(22, 22, 21, 20)
-        viewport_layout.setSpacing(16)
+        viewport_layout.setContentsMargins(11, 9, 11, 9)
+        viewport_layout.setSpacing(7)
 
         toolbar = QWidget()
         toolbar.setObjectName("TopBar")
         top_layout = QHBoxLayout(toolbar)
-        top_layout.setContentsMargins(13, 9, 13, 9)
-        top_layout.setSpacing(8)
+        top_layout.setContentsMargins(10, 4, 10, 4)
+        top_layout.setSpacing(5)
         top_layout.setDirection(QHBoxLayout.Direction.RightToLeft)
 
         self.sidebar_toggle = self._button("☰", "جمع/باز کردن منوی ابزارها", self.toggle_sidebar)
@@ -180,11 +180,11 @@ class MainWindow(QMainWindow):
 
         self.sidebar = QWidget()
         self.sidebar.setObjectName("SideBar")
-        self.sidebar.setMinimumWidth(235)
-        self.sidebar.setMaximumWidth(540)
+        self.sidebar.setMinimumWidth(210)
+        self.sidebar.setMaximumWidth(345)
         side_layout = QVBoxLayout(self.sidebar)
-        side_layout.setContentsMargins(19, 28, 19, 19)
-        side_layout.setSpacing(13)
+        side_layout.setContentsMargins(12, 17, 12, 12)
+        side_layout.setSpacing(8)
         side_layout.setDirection(QVBoxLayout.Direction.TopToBottom)
 
         brand_mark = QLabel("HTML  /  WORKSPACE")
@@ -195,7 +195,7 @@ class MainWindow(QMainWindow):
         brand.setObjectName("AppTitle")
         brand.setAlignment(Qt.AlignmentFlag.AlignRight)
         side_layout.addWidget(brand)
-        note = QLabel("همه ابزارهای ذخیره‌شده، همیشه همین‌جا")
+        note = QLabel("دسترسی سریع به فایل‌های HTML")
         note.setObjectName("MutedText")
         note.setAlignment(Qt.AlignmentFlag.AlignRight)
         side_layout.addWidget(note)
@@ -207,15 +207,15 @@ class MainWindow(QMainWindow):
         self.search.setPlaceholderText("جستجو بین ابزارهای ذخیره‌شده…")
         self.search.setClearButtonEnabled(True)
         self.search.textChanged.connect(self.populate_tools)
-        side_layout.addSpacing(8)
+        side_layout.addSpacing(2)
         side_layout.addWidget(self.search)
 
         self.list_widget = QListWidget()
         self.list_widget.setObjectName("ToolList")
         self.list_widget.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        self.list_widget.setIconSize(QSize(25, 25))
+        self.list_widget.setIconSize(QSize(20, 20))
         self.list_widget.setUniformItemSizes(True)
-        self.list_widget.setSpacing(2)
+        self.list_widget.setSpacing(1)
         self.list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.list_widget.customContextMenuRequested.connect(self.open_item_menu)
         self.list_widget.itemClicked.connect(self.activate_item)
@@ -232,12 +232,12 @@ class MainWindow(QMainWindow):
 
         add = QPushButton("افزودن ابزار جدید")
         add.setObjectName("PrimaryButton")
-        add.setIcon(icon("plus", "#FFFFFF", 20))
-        add.setIconSize(QSize(20, 20))
-        add.setMinimumHeight(50)
+        add.setIcon(icon("plus", "#FFFFFF", 18))
+        add.setIconSize(QSize(18, 18))
+        add.setMinimumHeight(41)
         add.clicked.connect(self.add_tool)
         side_layout.addWidget(add)
-        helper = QLabel("ویرایش، حذف و جابه‌جایی با راست‌کلیک روی ابزار")
+        helper = QLabel("راست‌کلیک: ویرایش، حذف یا مرتب‌سازی")
         helper.setObjectName("MutedText")
         helper.setAlignment(Qt.AlignmentFlag.AlignCenter)
         helper.setWordWrap(True)
@@ -252,13 +252,13 @@ class MainWindow(QMainWindow):
         button = QToolButton()
         icon_name = {"☰": "menu", "↻": "refresh", "↗": "external", "☀": "sun"}.get(label)
         if icon_name:
-            button.setIcon(icon(icon_name, "#6B7D9A", 21))
-            button.setIconSize(QSize(21, 21))
+            button.setIcon(icon(icon_name, "#6B7D9A", 19))
+            button.setIconSize(QSize(19, 19))
         else:
             button.setText(label)
         button.setObjectName("IconButton")
         button.setToolTip(tooltip)
-        button.setFixedSize(42, 40)
+        button.setFixedSize(34, 34)
         button.clicked.connect(handler)
         return button
 
@@ -277,7 +277,7 @@ class MainWindow(QMainWindow):
             (self.open_button, "external"),
             (self.theme_button, "sun" if dark else "moon"),
         ):
-            control.setIcon(icon(name, color, 21))
+            control.setIcon(icon(name, color, 19))
         self.populate_tools()
 
     def focus_search(self) -> None:
@@ -296,7 +296,7 @@ class MainWindow(QMainWindow):
 
     def toggle_sidebar(self) -> None:
         if self.sidebar.isVisible():
-            self._last_sidebar_width = max(240, self.sidebar.width())
+            self._last_sidebar_width = max(210, self.sidebar.width())
             self.sidebar.hide()
         else:
             self.sidebar.show()
@@ -312,7 +312,7 @@ class MainWindow(QMainWindow):
             for tool in visible:
                 entry = QListWidgetItem(tool.title)
                 entry.setIcon(tool_icon(tool.id, self.store.state.theme == "dark"))
-                entry.setSizeHint(QSize(0, 57))
+                entry.setSizeHint(QSize(0, 43))
                 entry.setData(ROLE_ID, tool.id)
                 entry.setToolTip(tool.description or "برای ویرایش یا حذف، راست‌کلیک کنید")
                 entry.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
