@@ -19,6 +19,7 @@ from .theme import stylesheet
 from .icons import icon, tool_icon
 from .jalali import format_jalali_date, persian_digits
 from .tool_cards import ToolCardDelegate
+from .web_state import CAPTURE_SCRIPT, read_snapshot, restore_script, save_snapshot
 
 ROLE_ID = Qt.ItemDataRole.UserRole
 
@@ -46,13 +47,19 @@ class WelcomePanel(QWidget):
         logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(logo)
 
-        self.title = QLabel("میزکار ابزارهای HTML")
+        self.title = QLabel("ابزارهای شما آماده‌اند")
         self.title.setObjectName("WelcomeTitle")
         self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title.setWordWrap(True)
         layout.addWidget(self.title)
 
-        self.message = QLabel("ابزار موردنظر را از فهرست سمت راست انتخاب کنید،\nیا اولین فایل HTML خود را به میزکار اضافه کنید.")
+        self.arrow = QLabel("↗")
+        self.arrow.setObjectName("WelcomeArrow")
+        self.arrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.arrow)
+
+        self.message = QLabel("روی ابزار موردنظر در ستون سمت راست کلیک کنید")
+        
         self.message.setObjectName("MutedText")
         self.message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.message.setWordWrap(True)
@@ -61,11 +68,13 @@ class WelcomePanel(QWidget):
         body.addStretch(1)
 
     def show_welcome(self) -> None:
-        self.title.setText("میزکار ابزارهای HTML")
-        self.message.setText("ابزار موردنظر را از فهرست سمت راست انتخاب کنید،\nیا اولین فایل HTML خود را به میزکار اضافه کنید.")
+        self.title.setText("ابزارهای شما آماده‌اند")
+        self.arrow.show()
+        self.message.setText("روی ابزار موردنظر در ستون سمت راست کلیک کنید")
 
     def show_error(self, path: str) -> None:
         self.title.setText("فایل HTML در دسترس نیست")
+        self.arrow.hide()
         self.message.setText("فایل اصلی جابه‌جا یا حذف شده است.\nاز منوی ابزار، گزینهٔ «ویرایش» را انتخاب و مسیر جدید را ثبت کنید.\n\n" + path)
 
 
@@ -85,7 +94,9 @@ class MainWindow(QMainWindow):
         self._view_paths = {}  # tool id -> last loaded HTML path
         self._view_order = []  # least recently selected first
         self._standby_browser = None
-        self._max_cached_tools = 3
+        self._max_cached_tools = 2
+        self._is_finishing_close = False
+        self._snapshot_pending_close = False
         self._zoom_by_tool: dict[str, float] = {}
         self._build_ui()
         self.apply_theme()
@@ -106,8 +117,11 @@ class MainWindow(QMainWindow):
         self.date_timer.setInterval(60_000)
         self.date_timer.timeout.connect(self.refresh_shamsi_date)
         self.date_timer.start()
-        # Build and warm Chromium after the window has painted, not on the first click.
-        QTimer.singleShot(350, self._prewarm_browser)
+        # No Chromium work on startup: the welcome screen must never freeze.
+        self.snapshot_timer = QTimer(self)
+        self.snapshot_timer.setInterval(1800)
+        self.snapshot_timer.timeout.connect(self.capture_active_storage)
+        self.snapshot_timer.start()
         if store.warning:
             QTimer.singleShot(0, lambda: QMessageBox.warning(self, "بازیابی تنظیمات", store.warning))
 
@@ -135,9 +149,7 @@ class MainWindow(QMainWindow):
         settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
         profile.downloadRequested.connect(self.handle_download)
         self.profile = profile
-        self._standby_browser = self._new_web_view()
-        self.stack.addWidget(self._standby_browser)
-        self._standby_browser.load(QUrl("about:blank"))
+        # Avoid spawning Chromium or loading blank pages until a user picks a tool.
 
     def _new_web_view(self):
         """Create one isolated page sharing the same disk cache and LocalStorage."""
@@ -153,17 +165,6 @@ class MainWindow(QMainWindow):
             lambda request, owner=view: self.handle_new_window(request, owner)
         )
         return view
-
-    def _prewarm_browser(self) -> None:
-        """Keep application startup responsive while hiding Chromium cold start."""
-        if self.profile is not None:
-            return
-        try:
-            self._ensure_browser()
-        except Exception:
-            # Selecting an HTML file will retry and display the actionable error.
-            if self._standby_browser is None:
-                self.profile = None
 
     def _forget_view(self, tool_id: str) -> None:
         """Release an inactive cached page while retaining data on disk."""
@@ -192,12 +193,8 @@ class MainWindow(QMainWindow):
         if len(self._view_cache) >= self._max_cached_tools:
             self._forget_view(self._view_order[0])
 
-        if self._standby_browser is not None:
-            view = self._standby_browser
-            self._standby_browser = None
-        else:
-            view = self._new_web_view()
-            self.stack.addWidget(view)
+        view = self._new_web_view()
+        self.stack.addWidget(view)
 
         self._view_cache[tool_id] = view
         self._view_order.append(tool_id)
