@@ -44,6 +44,12 @@ class TestMainWindow(unittest.TestCase):
                 self.loads.append(url.toLocalFile())
             def page(self):
                 return self
+            def scripts(self):
+                return self
+            def clear(self):
+                pass
+            def insert(self, script):
+                pass
 
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
