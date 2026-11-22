@@ -203,7 +203,12 @@ class MainWindow(QMainWindow):
 
             def received(data):
                 try:
-                    save_snapshot(tool_id, path, data)
+                    # A page can navigate between the JS request and its callback.
+                    # Never put another file's data into this tool's backup.
+                    current_url = data.get("url", "") if isinstance(data, dict) else ""
+                    local_file = QUrl(current_url).toLocalFile() if isinstance(current_url, str) else ""
+                    if local_file and Path(local_file).resolve() == Path(path).resolve():
+                        save_snapshot(tool_id, path, data)
                 finally:
                     if finished:
                         finished()
