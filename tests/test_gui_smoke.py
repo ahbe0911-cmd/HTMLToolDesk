@@ -12,6 +12,8 @@ from main import create_application
 from html_tooldesk.models import Tool
 from html_tooldesk.storage import Store
 from html_tooldesk.window import MainWindow
+from html_tooldesk.tool_cards import ToolCardDelegate, color_for_tool
+from html_tooldesk.jalali import format_jalali_date
 
 
 class TestMainWindow(unittest.TestCase):
@@ -35,6 +37,9 @@ class TestMainWindow(unittest.TestCase):
             def __init__(self):
                 super().__init__()
                 self.loads = []
+                self.zooms = []
+            def setZoomFactor(self, value):
+                self.zooms.append(value)
             def load(self, url):
                 self.loads.append(url.toLocalFile())
             def page(self):
@@ -65,6 +70,20 @@ class TestMainWindow(unittest.TestCase):
                 self.assertEqual(len(first.loads), 1)
                 self.assertEqual(len(second.loads), 1)
                 self.assertIs(window.stack.currentWidget(), first)
+                window.zoom_in()
+                window.zoom_in()
+                self.assertAlmostEqual(first.zooms[-1], 1.2)
+                self.assertEqual(window.zoom_reset_button.text(), "۱۲۰٪")
+                self.assertEqual(len(first.loads), 1, "Zoom must not reload HTML")
+                window.show_tool(tools[1])
+                self.assertAlmostEqual(second.zooms[-1], 1.0, "Each tool gets its own zoom")
+                window.zoom_out()
+                self.assertAlmostEqual(second.zooms[-1], 0.9)
+                window.show_tool(tools[0])
+                self.assertAlmostEqual(first.zooms[-1], 1.2)
+                window.zoom_reset()
+                self.assertAlmostEqual(first.zooms[-1], 1.0)
+                self.assertEqual(window.zoom_reset_button.text(), "۱۰۰٪")
                 self.assertEqual(window.list_widget.count(), 2)
             finally:
                 window.close()
@@ -80,8 +99,15 @@ class TestMainWindow(unittest.TestCase):
             window = MainWindow(Store(statefile))
             try:
                 self.assertEqual(window.list_widget.count(), 2)
+                self.assertIsInstance(window.list_widget.itemDelegate(), ToolCardDelegate)
+                self.assertEqual(window.date_label.text(), format_jalali_date())
+                self.assertTrue(window.zoom_in_button is not None)
                 self.assertEqual(window.list_widget.item(0).text(), "ابزار یک")
                 self.assertFalse(window.list_widget.item(0).icon().isNull())
+                bg, border, accent = color_for_tool(store.state.items[0].id)
+                self.assertTrue(bg.startswith("#"))
+                self.assertNotEqual(bg, border)
+                self.assertNotEqual(border, accent)
                 self.assertIsNone(window.browser, "Chromium should be lazy-loaded")
                 self.assertEqual(window.splitter.widget(1), window.sidebar)
                 window.search.setText("دوم")
