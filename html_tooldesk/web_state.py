@@ -19,14 +19,16 @@ from .storage import user_data_directory
 MAX_SNAPSHOT_BYTES = 8 * 1024 * 1024
 
 CAPTURE_SCRIPT = r"""(() => {
-  const out = {local: {}, session: {}, url: location.href};
-  for (const [label, store] of [['local', window.localStorage], ['session', window.sessionStorage]]) {
+  const out = {local: {}, session: {}, access: {}, url: location.href};
+  for (const label of ['local', 'session']) {
     try {
+      const store = label === 'local' ? window.localStorage : window.sessionStorage;
       for (let i=0; i < store.length; i++) {
         const key = store.key(i);
         if (key !== null) out[label][key] = store.getItem(key);
       }
-    } catch (_) {}
+      out.access[label] = true;
+    } catch (_) { out.access[label] = false; }
   }
   return out;
 })()"""
@@ -65,6 +67,18 @@ def save_snapshot(tool_id: str, path: str, result: object, root: Path | None = N
         for k, v in result[name].items()
     ):
         return False
+    # If the browser denies storage access, keep the last valid saved state.
+    accessible = result.get("access")
+    if isinstance(accessible, dict):
+        if not accessible.get("local") and not accessible.get("session"):
+            return False
+        if not accessible.get("local") or not accessible.get("session"):
+            previous = read_snapshot(tool_id, path, root)
+            for name in ("local", "session"):
+                if not accessible.get(name):
+                    result = dict(result)
+                    result[name] = previous.get(name, {})
+
     payload = {
         "version": 1,
         "path": str(Path(path).resolve()),
