@@ -25,7 +25,8 @@ def main() -> int:
     try:
         store = Store()
         window = MainWindow(store)
-        window.show()
+        # Normal maximized window: fills available desktop area, retains taskbar and title bar.
+        window.showMaximized()
         return app.exec()
     except Exception as exc:
         QMessageBox.critical(None, "خطا در اجرای برنامه", f"برنامه نتوانست اجرا شود:\n{exc}")
