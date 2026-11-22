@@ -79,6 +79,11 @@ class MainWindow(QMainWindow):
         self.profile = None
         self.page = None
         self._loaded_tool_path = None
+        self._view_cache = {}  # tool id -> live QWebEngineView (bounded)
+        self._view_paths = {}  # tool id -> last loaded HTML path
+        self._view_order = []  # least recently selected first
+        self._standby_browser = None
+        self._max_cached_tools = 3
         self._build_ui()
         self.apply_theme()
         self.populate_tools()
@@ -89,15 +94,17 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+N"), self, self.add_tool)
         QShortcut(QKeySequence("Ctrl+F"), self, self.focus_search)
         QShortcut(QKeySequence("F5"), self, self.reload_current)
+        # Build and warm Chromium after the window has painted, not on the first click.
+        QTimer.singleShot(350, self._prewarm_browser)
         if store.warning:
             QTimer.singleShot(0, lambda: QMessageBox.warning(self, "بازیابی تنظیمات", store.warning))
 
     def _ensure_browser(self) -> None:
-        """Lazily initialize Chromium once; reuse the same page for every HTML tool."""
-        if self.browser is not None:
+        """Create one persistent Chromium profile and warm an invisible first view."""
+        if self.profile is not None:
             return
-        from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineSettings
-        from PyQt6.QtWebEngineWidgets import QWebEngineView
+
+        from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
 
         storage_root = user_data_directory()
         (storage_root / "web_profile").mkdir(parents=True, exist_ok=True)
@@ -114,17 +121,79 @@ class MainWindow(QMainWindow):
         settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
         settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
         settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
-        browser = QWebEngineView(self.stack)
-        page = QWebEnginePage(profile, browser)
-        browser.setPage(page)
-        browser.loadStarted.connect(self.on_load_started)
-        browser.loadFinished.connect(self.on_load_finished)
-        page.newWindowRequested.connect(self.handle_new_window)
         profile.downloadRequested.connect(self.handle_download)
-        self.profile, self.page, self.browser = profile, page, browser
-        self.stack.addWidget(browser)
+        self.profile = profile
+        self._standby_browser = self._new_web_view()
+        self.stack.addWidget(self._standby_browser)
+        self._standby_browser.load(QUrl("about:blank"))
+
+    def _new_web_view(self):
+        """Create one isolated page sharing the same disk cache and LocalStorage."""
+        from PyQt6.QtWebEngineWidgets import QWebEngineView
+        from PyQt6.QtWebEngineCore import QWebEnginePage
+
+        view = QWebEngineView(self.stack)
+        page = QWebEnginePage(self.profile, view)
+        view.setPage(page)
+        view.loadStarted.connect(self.on_load_started)
+        view.loadFinished.connect(self.on_load_finished)
+        page.newWindowRequested.connect(
+            lambda request, owner=view: self.handle_new_window(request, owner)
+        )
+        return view
+
+    def _prewarm_browser(self) -> None:
+        """Keep application startup responsive while hiding Chromium cold start."""
+        if self.profile is not None:
+            return
+        try:
+            self._ensure_browser()
+        except Exception:
+            # Selecting an HTML file will retry and display the actionable error.
+            if self._standby_browser is None:
+                self.profile = None
+
+    def _forget_view(self, tool_id: str) -> None:
+        """Release an inactive cached page while retaining data on disk."""
+        view = self._view_cache.pop(tool_id, None)
+        self._view_paths.pop(tool_id, None)
+        if tool_id in self._view_order:
+            self._view_order.remove(tool_id)
+        if view is None:
+            return
+        if view is self.browser:
+            self.browser = None
+            self.page = None
+        if self.stack.currentWidget() is view:
+            self.stack.setCurrentWidget(self.welcome)
+        view.stop()
+        self.stack.removeWidget(view)
+        view.deleteLater()
+
+    def _get_view_for_tool(self, tool_id: str):
+        """LRU cache: revisiting up to three tools does not reload HTML/JavaScript."""
+        if tool_id in self._view_cache:
+            self._view_order.remove(tool_id)
+            self._view_order.append(tool_id)
+            return self._view_cache[tool_id]
+
+        if len(self._view_cache) >= self._max_cached_tools:
+            self._forget_view(self._view_order[0])
+
+        if self._standby_browser is not None:
+            view = self._standby_browser
+            self._standby_browser = None
+        else:
+            view = self._new_web_view()
+            self.stack.addWidget(view)
+
+        self._view_cache[tool_id] = view
+        self._view_order.append(tool_id)
+        return view
 
     def on_load_started(self) -> None:
+        if self.sender() is not self.browser or self.stack.currentWidget() is not self.browser:
+            return
         self.loading_label.setText("در حال بارگذاری…")
         self.loading_label.show()
 
