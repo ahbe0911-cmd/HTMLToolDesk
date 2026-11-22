@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 def child(mode: str, base: Path) -> int:
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    os.environ.setdefault("QT_QPA_PLATFORM", "windows")
     os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu --no-sandbox")
 
     from PyQt6.QtCore import QTimer
@@ -115,7 +115,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="htmltool-webtest-") as tmp:
         for phase in ("write", "read"):
             env = os.environ.copy()
-            env["QT_QPA_PLATFORM"] = "offscreen"
+            env["QT_QPA_PLATFORM"] = "windows"
             env["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --no-sandbox"
             result = subprocess.run(
                 [sys.executable, __file__, phase, tmp],
