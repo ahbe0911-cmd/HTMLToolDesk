@@ -42,7 +42,7 @@ class Tool:
 class AppState:
     items: list[Tool] = field(default_factory=list)
     theme: str = "light"
-    sidebar_width: int = 320
+    sidebar_width: int = 252
 
     def to_dict(self) -> dict:
         return {
