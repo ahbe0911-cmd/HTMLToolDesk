@@ -83,9 +83,9 @@ class MainWindow(QMainWindow):
         self.apply_theme()
         self.populate_tools()
         self.setWindowTitle("میزکار ابزارهای HTML | HTMLToolDesk")
-        self.resize(1300, 820)
+        self.resize(1350, 860)
         self.setMinimumSize(840, 520)
-        self.splitter.setSizes([980, store.state.sidebar_width])
+        self.splitter.setSizes([1000, store.state.sidebar_width])
         QShortcut(QKeySequence("Ctrl+N"), self, self.add_tool)
         QShortcut(QKeySequence("Ctrl+F"), self, self.focus_search)
         QShortcut(QKeySequence("F5"), self, self.reload_current)
@@ -229,9 +229,11 @@ class MainWindow(QMainWindow):
         self.count.setAlignment(Qt.AlignmentFlag.AlignRight)
         side_layout.addWidget(self.count)
 
-        add = QPushButton("＋  افزودن ابزار جدید")
+        add = QPushButton("افزودن ابزار جدید")
         add.setObjectName("PrimaryButton")
-        add.setMinimumHeight(47)
+        add.setIcon(icon("plus", "#FFFFFF", 20))
+        add.setIconSize(QSize(20, 20))
+        add.setMinimumHeight(50)
         add.clicked.connect(self.add_tool)
         side_layout.addWidget(add)
         helper = QLabel("ویرایش، حذف و جابه‌جایی با راست‌کلیک روی ابزار")
@@ -317,7 +319,7 @@ class MainWindow(QMainWindow):
                 if tool.id == self.active_id:
                     self.list_widget.setCurrentItem(entry)
             count = len(self.store.state.items)
-            self.count.setText(f"{len(visible)} ابزار از {count} مورد" if query else f"تعداد ابزارها: {count}")
+            self.count.setText(f"{len(visible)} ابزار از {count} مورد" if query else f"{count} ابزار ذخیره‌شده")
             self.list_widget.setDragDropMode(
                 QAbstractItemView.DragDropMode.NoDragDrop if query
                 else QAbstractItemView.DragDropMode.InternalMove
@@ -513,9 +515,11 @@ class MainWindow(QMainWindow):
             self.stack.setCurrentWidget(self.welcome)
 
     def handle_new_window(self, request) -> None:
-        # Even target=_blank and window.open are routed into the existing view.
-        if self.page is not None:
-            request.openIn(self.page)
+        """Never create tabs or external windows from embedded HTML navigation."""
+        url = request.requestedUrl()
+        if self.browser is not None and url.isValid() and url.scheme() in ("file", "http", "https"):
+            # target=_blank links are redirected into the same permanent viewport.
+            self.browser.load(url)
 
     def handle_download(self, download) -> None:
         suggested = download.downloadFileName()
