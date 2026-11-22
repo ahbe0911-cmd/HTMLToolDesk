@@ -52,6 +52,7 @@ def stylesheet(mode: str) -> str:
     QLabel#AppTitle {{ color: {text}; font-size: 17px; font-weight: 700; }}
     QLabel#SectionTitle {{ font-size: 14px; font-weight: 600; }}
     QLabel#WelcomeTitle {{ font-size: 23px; font-weight: 700; }}
+    QLabel#WelcomeArrow {{ color: {accent}; font-family: "Segoe UI Symbol"; font-size: 48px; font-weight: 700; }}
     QLabel#BrandCaption {{ color: {accent}; letter-spacing: 1px; font-size: 9px; font-weight: 600; }}
     QLabel#ShamsiDate {{ color: {accent}; background: {selected}; border: 1px solid {line};
         border-radius: 8px; padding: 5px 11px; font-size: 11px; font-weight: 600; }}
