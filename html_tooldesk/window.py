@@ -17,6 +17,8 @@ from .models import Tool
 from .storage import Store, user_data_directory
 from .theme import stylesheet
 from .icons import icon, tool_icon
+from .jalali import format_jalali_date, persian_digits
+from .tool_cards import ToolCardDelegate
 
 ROLE_ID = Qt.ItemDataRole.UserRole
 
@@ -84,6 +86,7 @@ class MainWindow(QMainWindow):
         self._view_order = []  # least recently selected first
         self._standby_browser = None
         self._max_cached_tools = 3
+        self._zoom_by_tool: dict[str, float] = {}
         self._build_ui()
         self.apply_theme()
         self.populate_tools()
@@ -94,6 +97,15 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+N"), self, self.add_tool)
         QShortcut(QKeySequence("Ctrl+F"), self, self.focus_search)
         QShortcut(QKeySequence("F5"), self, self.reload_current)
+        QShortcut(QKeySequence("Ctrl+="), self, self.zoom_in)
+        QShortcut(QKeySequence("Ctrl++"), self, self.zoom_in)
+        QShortcut(QKeySequence("Ctrl+-"), self, self.zoom_out)
+        QShortcut(QKeySequence("Ctrl+0"), self, self.zoom_reset)
+        # The local date may change while the app stays open overnight.
+        self.date_timer = QTimer(self)
+        self.date_timer.setInterval(60_000)
+        self.date_timer.timeout.connect(self.refresh_shamsi_date)
+        self.date_timer.start()
         # Build and warm Chromium after the window has painted, not on the first click.
         QTimer.singleShot(350, self._prewarm_browser)
         if store.warning:
