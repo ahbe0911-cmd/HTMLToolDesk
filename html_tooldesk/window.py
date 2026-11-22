@@ -383,6 +383,40 @@ class MainWindow(QMainWindow):
             control.setIcon(icon(name, color, 19))
         self.populate_tools()
 
+    def refresh_shamsi_date(self) -> None:
+        """Use the user's local Windows calendar date; update after midnight."""
+        self.date_label.setText(format_jalali_date())
+
+    def update_zoom_label(self) -> None:
+        factor = self._zoom_by_tool.get(self.active_id or "", 1.0)
+        self.zoom_reset_button.setText(f"{persian_digits(round(factor * 100))}٪")
+
+    def _set_zoom_for_active(self, factor: float) -> None:
+        """Apply page zoom without reloading the HTML or changing other tools."""
+        if not self.active_id:
+            return
+        view = self._view_cache.get(self.active_id)
+        if view is None:
+            return
+        bounded = round(min(2.5, max(0.5, factor)), 2)
+        self._zoom_by_tool[self.active_id] = bounded
+        # Fake views used by GUI regression tests expose setZoomFactor too.
+        view.setZoomFactor(bounded)
+        self.update_zoom_label()
+
+    def zoom_in(self) -> None:
+        if self.active_id:
+            factor = self._zoom_by_tool.get(self.active_id, 1.0)
+            self._set_zoom_for_active(factor + 0.1)
+
+    def zoom_out(self) -> None:
+        if self.active_id:
+            factor = self._zoom_by_tool.get(self.active_id, 1.0)
+            self._set_zoom_for_active(factor - 0.1)
+
+    def zoom_reset(self) -> None:
+        self._set_zoom_for_active(1.0)
+
     def focus_search(self) -> None:
         if not self.sidebar.isVisible():
             self.toggle_sidebar()
@@ -468,6 +502,7 @@ class MainWindow(QMainWindow):
         self.browser = view
         self.page = view.page()
         self.stack.setCurrentWidget(view)
+        self._set_zoom_for_active(self._zoom_by_tool.get(tool.id, 1.0))
         if self._view_paths.get(tool.id) == path:
             self.loading_label.hide()
             return
@@ -547,6 +582,7 @@ class MainWindow(QMainWindow):
         if self.active_id == tool_id:
             self.clear_selection()
         self._forget_view(tool_id)
+        self._zoom_by_tool.pop(tool_id, None)
         self.populate_tools()
 
     def move_item(self, tool_id: str, offset: int) -> None:
