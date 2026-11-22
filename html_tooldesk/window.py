@@ -125,6 +125,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(browser)
 
     def on_load_started(self) -> None:
+        self.loading_label.setText("در حال بارگذاری…")
         self.loading_label.show()
 
     def _build_ui(self) -> None:
@@ -508,11 +509,13 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "باز کردن مرورگر", "سیستم نتوانست مرورگر پیش‌فرض را باز کند.")
 
     def on_load_finished(self, ok: bool) -> None:
+        # Chromium can report failed/cancelled loads while the user switches tools.
+        # Keep the viewport visible instead of replacing an in-flight page.
         self.loading_label.hide()
         if not ok and self.browser is not None and self.stack.currentWidget() == self.browser:
             self._loaded_tool_path = None
-            self.welcome.show_error("نمایش این صفحه با خطا روبه‌رو شد. فایل و منابع وابسته به آن را بررسی کنید.")
-            self.stack.setCurrentWidget(self.welcome)
+            self.loading_label.setText("بارگذاری ناموفق؛ دوباره تلاش کنید")
+            self.loading_label.show()
 
     def handle_new_window(self, request) -> None:
         """Never create tabs or external windows from embedded HTML navigation."""
