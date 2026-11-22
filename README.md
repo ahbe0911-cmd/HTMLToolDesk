@@ -1,5 +1,117 @@
-# HTMLToolDesk
+# میزکار ابزارهای HTML – HTMLToolDesk
 
-میزکار فارسی برای مدیریت و اجرای ابزارهای HTML در ویندوز با PyQt6 و Qt WebEngine.
+برنامهٔ ویندوزی **فارسی و راست‌به‌چپ** مبتنی بر **Python + PyQt6 + PyQt6-WebEngine** برای سازمان‌دهی و اجرای فایل‌های محلی HTML.
 
-Source, packaging and CI will be committed to this repository.
+## امکانات
+
+- سایدبار سمت راست با جستجوی عنوان فارسی، نمایش عنوان بدون نمایش مسیر، تغییر اندازه و امکان مخفی‌کردن.
+- اضافه‌کردن ابزار، ویرایش عنوان/توضیح/مسیر، حذف از فهرست **بدون حذف فایل اصلی**.
+- مرتب‌سازی با کشیدن آیتم‌ها و گزینه‌های راست‌کلیک «بالا/پایین».
+- Chromium داخلی با JavaScript، CSS، فایل‌های جانبی محلی و LocalStorage.
+- تم روشن/تاریک، خوش‌آمدگویی، دکمهٔ Reload و بازکردن HTML در مرورگر پیش‌فرض.
+- ذخیرهٔ اتمیک تنظیمات در `config.json` و پشتیبان‌گیری از تنظیمات خراب.
+- فونت اختیاری Vazirmatn و جایگزین خودکار Tahoma در ویندوز.
+- نمونهٔ HTML/CSS/JS برای بررسی ذخیره‌شدن داده‌های LocalStorage.
+
+## ساختار پروژه
+
+```text
+HTMLToolDesk/
+├── main.py
+├── requirements.txt
+├── HTMLToolDesk.spec
+├── build_windows.bat
+├── README.md
+├── html_tooldesk/
+│   ├── __init__.py
+│   ├── models.py
+│   ├── storage.py
+│   ├── paths.py
+│   ├── theme.py
+│   ├── dialogs.py
+│   └── window.py
+├── assets/fonts/
+│   ├── README.txt
+│   └── Vazirmatn-Regular.ttf        ← پس از دانلود (اختیاری)
+├── examples/
+│   ├── sample.html
+│   ├── styles.css
+│   └── app.js
+├── tests/test_storage.py
+├── scripts/download_vazirmatn.ps1
+└── .github/workflows/build-windows.yml
+```
+
+## اجرای برنامه از سورس (ویندوز)
+
+پیش‌نیاز: **Windows 10/11 64-bit** و **Python 3.12 x64**.
+
+در پوشهٔ پروژه، PowerShell باز کنید:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\download_vazirmatn.ps1
+python main.py
+```
+
+اگر PowerShell اجازهٔ فعال‌سازی محیط مجازی نداد، دستورات را بدون Activate اجرا کنید:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe main.py
+```
+
+برای آزمایش برنامه یک ابزار جدید با مسیر `examples/sample.html` اضافه کنید، یادداشت را ذخیره کنید، برنامه را ببندید و دوباره باز کنید.
+
+## ساخت EXE (ویندوز)
+
+**ساده‌ترین راه:** روی `build_windows.bat` دوبار کلیک کنید. وابستگی‌ها نصب، تست‌ها اجرا، فونت رسمی در صورت دسترسی دانلود و سپس فایل زیر ایجاد می‌شود:
+
+```text
+dist\HTMLToolDesk.exe
+```
+
+**راه دستی:** بعد از نصب وابستگی‌ها:
+
+```powershell
+python -m PyInstaller --clean --noconfirm HTMLToolDesk.spec
+```
+
+این فایل `.spec` سورس فونت و فایل‌های `assets` را بسته‌بندی می‌کند؛ importهای صریح WebEngine باعث می‌شوند PyInstaller hookهای باینری Qt WebEngine و subprocessهای لازم را شناسایی کند. این دستور را **در ویندوز** اجرا کنید؛ خروجی Linux به EXE ویندوز تبدیل نمی‌شود. فایل خروجی `onefile` است و ممکن است در اولین راه‌اندازی با کمی تأخیر فایل‌های Qt را استخراج کند.
+
+اگر برای عیب‌یابی به نسخهٔ پوشه‌ای نیاز دارید:
+
+```powershell
+python -m PyInstaller --noconfirm --clean --windowed --onedir --name HTMLToolDesk-debug --add-data "assets:assets" main.py
+```
+
+در PyInstaller جدید، جداکنندهٔ `--add-data` دو نقطه (`:`) است، حتی در ویندوز. برای ساخت معمولی، مسیر پیشنهادی **همان `.spec`** است.
+
+## دریافت EXE از GitHub Actions بدون نصب پایتون روی سیستم شما
+
+پروژه را در یک مخزن GitHub آپلود کنید و در تب **Actions**، workflow با نام **Build Windows EXE** را دستی اجرا کنید. بعد از موفقیت، از بخش **Artifacts** بستهٔ **HTMLToolDesk-Windows** را بگیرید. فایل `HTMLToolDesk.exe` درون آن است. اجرای workflow مستلزم فعال بودن GitHub Actions و دسترسی به مخزن است.
+
+## محل داده‌ها
+
+- `config.json`: کنار `HTMLToolDesk.exe` (برای اجرای سورس: کنار `main.py`) در صورتی که مسیر قابل‌نوشتن باشد.
+- اگر پوشهٔ برنامه مثل `C:\Program Files` قابل‌نوشتن نباشد، `config.json` در `%LOCALAPPDATA%\HTMLToolDesk\config.json` قرار می‌گیرد.
+- داده‌های LocalStorage / پروفایل وب: `%LOCALAPPDATA%\HTMLToolDesk\web_profile` (کش در `web_cache`).
+- فایل HTML و فایل‌های CSS، JS، تصاویر و فونت‌های وابسته به **مکان اصلی خودشان** باقی می‌مانند. برنامه فایل‌های HTML کاربر را کپی نمی‌کند؛ اگر جابه‌جا شوند باید مسیرشان را از «ویرایش» اصلاح کرد.
+- LocalStorage وابسته به origin هر فایل است. جابه‌جایی فایل به مسیر متفاوت، ممکن است داده‌های ذخیره‌شدهٔ قبلی آن صفحه را در آدرس جدید در دسترس نگذارد.
+
+## نکات فنی و امنیتی
+
+- HTML کاربر با JavaScript و مجوز دسترسی به فایل‌های محلی اجرا می‌شود. **فقط فایل‌های HTML مورداعتماد را اضافه کنید**. برای اجرای HTML ناشناس باید sandbox/محدودیت‌های دسترسی جداگانه در نظر گرفته شود.
+- وب‌سایت‌هایی که به APIهای اختصاصی Chrome، افزونه‌ها، Service Worker یا یک سرور HTTP نیاز دارند، الزاماً با `file://` کار نمی‌کنند؛ برخی به سرور محلی نیاز خواهند داشت.
+- مجموعهٔ PyQt6 با مجوزهای GPL/commercial و Qt WebEngine با تعهدات مجوزی خودش عرضه می‌شود؛ برای توزیع بستهٔ تجاری، مجوزها و noticeها را بررسی کنید.
+- فونت Vazirmatn از [مخزن رسمی](https://github.com/rastikerdar/vazirmatn) و تحت SIL OFL 1.1 است. در بستهٔ سورس اولیه فونت باینری قرار داده نشده؛ اسکریپت دانلود آن را به مسیر استاندارد اضافه می‌کند.
+
+## تست‌ها
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+تست‌های ذخیره‌سازی را می‌توان بدون اجرای UI اجرا کرد. تست واقعی رندر WebEngine و بسته‌بندی نهایی باید روی ویندوز انجام شود.
