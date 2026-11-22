@@ -11,6 +11,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+# Running a script by path makes scripts/ the first import root, not the repo.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 
 def child(mode: str, base: Path) -> int:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
