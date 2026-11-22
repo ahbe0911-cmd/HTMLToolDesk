@@ -21,9 +21,16 @@ python -m pip install --upgrade pip
 if errorlevel 1 exit /b 1
 python -m pip install -r requirements.txt
 if errorlevel 1 exit /b 1
-if not exist "assets\fonts\Vazirmatn-Regular.ttf" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\download_vazirmatn.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\download_vazirmatn.ps1"
+if errorlevel 1 (
+    echo Vazirmatn is required. Check the font download and try again.
+    pause
+    exit /b 1
 )
+set QT_QPA_PLATFORM=offscreen
+python -c "from PyQt6.QtWidgets import QApplication; from html_tooldesk.theme import install_font; a=QApplication([]); f=install_font(a); assert 'Vazirmatn' in f, 'Font not loaded'"
+if errorlevel 1 exit /b 1
+set QT_QPA_PLATFORM=
 python -m unittest discover -s tests -v
 if errorlevel 1 exit /b 1
 python -m PyInstaller --clean --noconfirm HTMLToolDesk.spec
