@@ -139,8 +139,11 @@ class MainWindow(QMainWindow):
         profile.setPersistentStoragePath(str(storage_root / "web_profile"))
         profile.setCachePath(str(storage_root / "web_cache"))
         profile.setPersistentCookiesPolicy(
-            QWebEngineProfile.PersistentCookiesPolicy.AllowPersistentCookies
+            QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies
         )
+        profile.setHttpCacheType(QWebEngineProfile.HttpCacheType.DiskHttpCache)
+        if profile.isOffTheRecord():
+            raise RuntimeError("ذخیره دائمی مرورگر فعال نشد. مسیر AppData را بررسی کنید.")
         settings = profile.settings()
         settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
         settings.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)
