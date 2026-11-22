@@ -242,6 +242,13 @@ class MainWindow(QMainWindow):
         self.viewport_title.setObjectName("SectionTitle")
         self.viewport_title.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         top_layout.addWidget(self.viewport_title, 1)
+        self.date_label = QLabel()
+        self.date_label.setObjectName("ShamsiDate")
+        self.date_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.date_label.setToolTip("تاریخ شمسی امروز مطابق ساعت سیستم")
+        self.refresh_shamsi_date()
+        top_layout.addWidget(self.date_label)
+        top_layout.addSpacing(7)
         self.reload_button = self._button("↻", "بارگذاری مجدد (F5)", self.reload_current)
         self.open_button = self._button("↗", "باز کردن در مرورگر ویندوز", self.open_external)
         self.theme_button = self._button("☀", "تغییر تم روشن/تاریک", self.toggle_theme)
@@ -250,6 +257,13 @@ class MainWindow(QMainWindow):
         self.loading_label.hide()
         top_layout.addWidget(self.loading_label)
         for button in (self.reload_button, self.open_button, self.theme_button):
+            top_layout.addWidget(button)
+        top_layout.addSpacing(9)
+        self.zoom_in_button = self._button("+", "بزرگ‌نمایی HTML (Ctrl++)", self.zoom_in)
+        self.zoom_reset_button = self._button("۱۰۰٪", "بازگشت به زوم ۱۰۰٪ (Ctrl+0)", self.zoom_reset)
+        self.zoom_reset_button.setFixedWidth(60)
+        self.zoom_out_button = self._button("−", "کوچک‌نمایی HTML (Ctrl+-)", self.zoom_out)
+        for button in (self.zoom_in_button, self.zoom_reset_button, self.zoom_out_button):
             top_layout.addWidget(button)
         viewport_layout.addWidget(toolbar)
 
@@ -297,6 +311,8 @@ class MainWindow(QMainWindow):
         self.list_widget.setIconSize(QSize(20, 20))
         self.list_widget.setUniformItemSizes(True)
         self.list_widget.setSpacing(1)
+        self.tool_card_delegate = ToolCardDelegate(self.list_widget, self.store.state.theme == "dark")
+        self.list_widget.setItemDelegate(self.tool_card_delegate)
         self.list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.list_widget.customContextMenuRequested.connect(self.open_item_menu)
         self.list_widget.itemClicked.connect(self.activate_item)
@@ -347,10 +363,16 @@ class MainWindow(QMainWindow):
         usable = bool(self.active_path and Path(self.active_path).is_file())
         self.reload_button.setEnabled(usable)
         self.open_button.setEnabled(usable)
+        for control in (self.zoom_in_button, self.zoom_reset_button, self.zoom_out_button):
+            control.setEnabled(usable)
+        self.update_zoom_label()
 
     def apply_theme(self) -> None:
         QApplication.instance().setStyleSheet(stylesheet(self.store.state.theme))
         dark = self.store.state.theme == "dark"
+        if hasattr(self, "tool_card_delegate"):
+            self.tool_card_delegate.dark = dark
+            self.list_widget.viewport().update()
         color = "#AEC0DB" if dark else "#53647D"
         for control, name in (
             (self.sidebar_toggle, "menu"),
@@ -393,7 +415,7 @@ class MainWindow(QMainWindow):
             for tool in visible:
                 entry = QListWidgetItem(tool.title)
                 entry.setIcon(tool_icon(tool.id, self.store.state.theme == "dark"))
-                entry.setSizeHint(QSize(0, 43))
+                entry.setSizeHint(QSize(0, 54))
                 entry.setData(ROLE_ID, tool.id)
                 entry.setToolTip(tool.description or "برای ویرایش یا حذف، راست‌کلیک کنید")
                 entry.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
