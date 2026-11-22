@@ -86,7 +86,7 @@ class Store:
             return AppState(
                 items=items,
                 theme=content.get("theme") if content.get("theme") in ("dark", "light") else "light",
-                sidebar_width=max(240, min(520, int(content.get("sidebar_width", 320)))),
+                sidebar_width=max(210, min(345, 252 if int(content.get("sidebar_width", 252)) == 320 else int(content.get("sidebar_width", 252)))),
             )
         except (OSError, ValueError, TypeError, OverflowError) as exc:
             suffix = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -123,4 +123,4 @@ class Store:
         self.save_state(AppState(list(self.state.items), theme, self.state.sidebar_width))
 
     def set_sidebar_width(self, width: int) -> None:
-        self.save_state(AppState(list(self.state.items), self.state.theme, max(240, min(520, width))))
+        self.save_state(AppState(list(self.state.items), self.state.theme, max(210, min(345, width))))
