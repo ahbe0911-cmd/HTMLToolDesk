@@ -7,7 +7,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import QCoreApplication, Qt
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QWidget
 from main import create_application
 from html_tooldesk.models import Tool
 from html_tooldesk.storage import Store
@@ -28,6 +28,46 @@ class TestMainWindow(unittest.TestCase):
         # The 2026-11-22 build crashed exactly on this late module import.
         from PyQt6.QtWebEngineWidgets import QWebEngineView
         self.assertIsNotNone(QWebEngineView)
+
+    def test_returning_to_cached_html_never_reloads_file(self):
+        """Switching between saved tools reuses pages rather than creating tabs."""
+        class FakeView(QWidget):
+            def __init__(self):
+                super().__init__()
+                self.loads = []
+            def load(self, url):
+                self.loads.append(url.toLocalFile())
+            def page(self):
+                return self
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            paths = [root / "first.html", root / "second.html"]
+            for file in paths:
+                file.write_text("<html><body>ready</body></html>", encoding="utf-8")
+            tools = [Tool.create("اول", str(paths[0])), Tool.create("دوم", str(paths[1]))]
+            store = Store(root / "settings.json")
+            store.with_items(tools)
+            window = MainWindow(Store(root / "settings.json"))
+            first, second = FakeView(), FakeView()
+            first.setParent(window.stack)
+            second.setParent(window.stack)
+            window.stack.addWidget(first)
+            window.stack.addWidget(second)
+            window._ensure_browser = lambda: None
+            window._view_cache = {tools[0].id: first, tools[1].id: second}
+            window._view_order = [tools[0].id, tools[1].id]
+            window._get_view_for_tool = lambda tool_id: window._view_cache[tool_id]
+            try:
+                window.show_tool(tools[0])
+                window.show_tool(tools[1])
+                window.show_tool(tools[0])
+                self.assertEqual(len(first.loads), 1)
+                self.assertEqual(len(second.loads), 1)
+                self.assertIs(window.stack.currentWidget(), first)
+                self.assertEqual(window.list_widget.count(), 2)
+            finally:
+                window.close()
 
     def test_saved_tools_render_in_right_sidebar_without_browser_startup(self):
         with tempfile.TemporaryDirectory() as temp:
