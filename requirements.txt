@@ -1,3 +1,4 @@
 PyQt6==6.11.0
 PyQt6-WebEngine==6.11.0
 PyInstaller>=6.15,<7
+jdatetime==6.1.1
