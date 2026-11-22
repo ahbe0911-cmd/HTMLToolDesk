@@ -1,0 +1,9 @@
+:root {font-family: Tahoma, sans-serif; color-scheme: light;}
+body {margin:0; min-height:100vh; display:grid; place-items:center; background:#eaf0fa; color:#16233e;}
+.card {box-sizing:border-box; width:min(90vw,640px); background:white; padding:42px; border-radius:25px; box-shadow:0 18px 60px #1e32521b;}
+h1 {font-size:28px;}
+.eyebrow {color:#3f71e9; font-weight:bold;}
+p {line-height:2;}
+textarea {box-sizing:border-box; width:100%; display:block; height:120px; margin:12px 0; border:1px solid #d9e2f1; border-radius:12px; padding:15px; font:inherit;}
+button {border:0; background:#386fed; color:white; border-radius:12px; padding:12px 24px; cursor:pointer; font:inherit;}
+#status {font-size:13px; color:#17845b;}
