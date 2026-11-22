@@ -753,7 +753,39 @@ class MainWindow(QMainWindow):
     def storage_error(self, exc: Exception) -> None:
         QMessageBox.critical(self, "خطای ذخیره‌سازی", f"ذخیره اطلاعات انجام نشد.\nلطفاً مجوز نوشتن روی پوشه تنظیمات را بررسی کنید.\n\n{exc}")
 
+    def _finish_pending_close(self) -> None:
+        """Finish shutting down once snapshots return or a short deadline expires."""
+        if not self._snapshot_pending_close:
+            return
+        self._snapshot_pending_close = False
+        self._is_finishing_close = True
+        self.close()
+
+    def _close_snapshot_finished(self) -> None:
+        if not self._snapshot_pending_close:
+            return
+        self._close_wait_remaining -= 1
+        if self._close_wait_remaining <= 0:
+            QTimer.singleShot(0, self._finish_pending_close)
+
     def closeEvent(self, event) -> None:
+        if self._snapshot_pending_close and not self._is_finishing_close:
+            event.ignore()
+            return
+
+        if not self._is_finishing_close and self._view_cache:
+            # QWebEnginePage.runJavaScript is asynchronous. Wait a bounded amount,
+            # never spin a nested event loop or block indefinitely on Chromium.
+            event.ignore()
+            self._snapshot_pending_close = True
+            self.snapshot_timer.stop()
+            self._close_wait_remaining = len(self._view_cache)
+            for tool_id, view in list(self._view_cache.items()):
+                self._capture_view_storage(tool_id, view, self._close_snapshot_finished)
+            QTimer.singleShot(1100, self._finish_pending_close)
+            return
+
+        self.snapshot_timer.stop()
         if self.sidebar.isVisible():
             self._last_sidebar_width = self.sidebar.width()
         try:
