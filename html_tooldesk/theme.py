@@ -53,6 +53,8 @@ def stylesheet(mode: str) -> str:
     QLabel#SectionTitle {{ font-size: 14px; font-weight: 600; }}
     QLabel#WelcomeTitle {{ font-size: 23px; font-weight: 700; }}
     QLabel#BrandCaption {{ color: {accent}; letter-spacing: 1px; font-size: 9px; font-weight: 600; }}
+    QLabel#ShamsiDate {{ color: {accent}; background: {selected}; border: 1px solid {line};
+        border-radius: 8px; padding: 5px 11px; font-size: 11px; font-weight: 600; }}
     QLabel#SectionCaption {{ color: {muted}; font-size: 10px; font-weight: 500; }}
     QLineEdit, QTextEdit {{ color: {text}; background: {raised}; border: 1px solid {line};
         border-radius: 9px; padding: 6px 9px; selection-background-color: {accent}; }}
@@ -69,11 +71,9 @@ def stylesheet(mode: str) -> str:
     QToolButton#IconButton:hover {{ background: {hover}; border-color: {line}; }}
     QListWidget#ToolList {{ background: transparent; color: {text}; border: 0;
         outline: none; font-size: 12px; font-weight: 500; }}
-    QListWidget#ToolList::item {{ padding: 3px 8px; margin: 2px 0;
-        border: 1px solid transparent; border-radius: 9px; }}
-    QListWidget#ToolList::item:hover {{ background: {hover}; }}
-    QListWidget#ToolList::item:selected {{ background: {selected}; color: {text};
-        border: 1px solid {accent}; }}
+    /* Custom ToolCardDelegate paints the backgrounds, not the stylesheet. */
+    QListWidget#ToolList::item {{ background: transparent; padding: 0; margin: 0; border: 0; }}
+    QListWidget#ToolList::item:selected {{ background: transparent; border: 0; }}
     QSplitter::handle {{ background: {line}; }}
     QDialog, QMessageBox, QMenu {{ background: {surface}; color: {text}; }}
     QMenu {{ border: 1px solid {line}; padding: 4px; }}
