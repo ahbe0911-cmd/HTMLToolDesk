@@ -33,6 +33,7 @@ if errorlevel 1 (
     exit /b 1
 )
 echo.
-echo EXE created: %CD%\dist\HTMLToolDesk.exe
+echo EXE created: %CD%\dist\HTMLToolDesk\HTMLToolDesk.exe
+echo IMPORTANT: Keep the whole HTMLToolDesk folder together.
 pause
 endlocal

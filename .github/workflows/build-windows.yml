@@ -34,6 +34,7 @@ jobs:
         run: python -m PyInstaller --clean --noconfirm HTMLToolDesk.spec
       - uses: actions/upload-artifact@v4
         with:
-          name: HTMLToolDesk-Windows
-          path: dist/HTMLToolDesk.exe
+          name: HTMLToolDesk-Fast-Windows
+          path: dist/HTMLToolDesk/
+          compression-level: 1
           if-no-files-found: error

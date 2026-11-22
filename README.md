@@ -7,7 +7,9 @@
 - سایدبار سمت راست با جستجوی عنوان فارسی، نمایش عنوان بدون نمایش مسیر، تغییر اندازه و امکان مخفی‌کردن.
 - اضافه‌کردن ابزار، ویرایش عنوان/توضیح/مسیر، حذف از فهرست **بدون حذف فایل اصلی**.
 - مرتب‌سازی با کشیدن آیتم‌ها و گزینه‌های راست‌کلیک «بالا/پایین».
-- Chromium داخلی با JavaScript، CSS، فایل‌های جانبی محلی و LocalStorage.
+- Chromium داخلی با JavaScript، CSS، فایل‌های جانبی محلی و LocalStorage، بدون تب یا پنجره اضافی.
+- راه‌اندازی **تنبُل (Lazy)** مرورگر؛ WebEngine فقط در نخستین اجرای یک ابزار بارگذاری می‌شود.
+- آیکون‌های SVG برداری برای هر ابزار و نوار ابزار؛ فهرست عمودی و ثابت سمت راست.
 - تم روشن/تاریک، خوش‌آمدگویی، دکمهٔ Reload و بازکردن HTML در مرورگر پیش‌فرض.
 - ذخیرهٔ اتمیک تنظیمات در `config.json` و پشتیبان‌گیری از تنظیمات خراب.
 - فونت اختیاری Vazirmatn و جایگزین خودکار Tahoma در ویندوز.
@@ -27,6 +29,7 @@ HTMLToolDesk/
 │   ├── models.py
 │   ├── storage.py
 │   ├── paths.py
+│   ├── icons.py
 │   ├── theme.py
 │   ├── dialogs.py
 │   └── window.py
@@ -70,7 +73,7 @@ python main.py
 **ساده‌ترین راه:** روی `build_windows.bat` دوبار کلیک کنید. وابستگی‌ها نصب، تست‌ها اجرا، فونت رسمی در صورت دسترسی دانلود و سپس فایل زیر ایجاد می‌شود:
 
 ```text
-dist\HTMLToolDesk.exe
+dist\HTMLToolDesk\HTMLToolDesk.exe
 ```
 
 **راه دستی:** بعد از نصب وابستگی‌ها:
@@ -79,7 +82,7 @@ dist\HTMLToolDesk.exe
 python -m PyInstaller --clean --noconfirm HTMLToolDesk.spec
 ```
 
-این فایل `.spec` سورس فونت و فایل‌های `assets` را بسته‌بندی می‌کند؛ importهای صریح WebEngine باعث می‌شوند PyInstaller hookهای باینری Qt WebEngine و subprocessهای لازم را شناسایی کند. این دستور را **در ویندوز** اجرا کنید؛ خروجی Linux به EXE ویندوز تبدیل نمی‌شود. فایل خروجی `onefile` است و ممکن است در اولین راه‌اندازی با کمی تأخیر فایل‌های Qt را استخراج کند.
+این فایل `.spec` سورس فونت و فایل‌های `assets` را بسته‌بندی می‌کند؛ importهای صریح WebEngine باعث می‌شوند PyInstaller hookهای باینری Qt WebEngine و subprocessهای لازم را شناسایی کند. این دستور را **در ویندوز** اجرا کنید؛ خروجی Linux به EXE ویندوز تبدیل نمی‌شود. خروجی جدید از نوع **onedir** است: اجرای آن سریع‌تر از بسته تک‌فایلی است؛ تمام فایل‌های پوشه `HTMLToolDesk` باید کنار فایل EXE باقی بمانند.
 
 اگر برای عیب‌یابی به نسخهٔ پوشه‌ای نیاز دارید:
 
@@ -91,12 +94,12 @@ python -m PyInstaller --noconfirm --clean --windowed --onedir --name HTMLToolDes
 
 ## دریافت EXE از GitHub Actions بدون نصب پایتون روی سیستم شما
 
-پروژه را در یک مخزن GitHub آپلود کنید و در تب **Actions**، workflow با نام **Build Windows EXE** را دستی اجرا کنید. بعد از موفقیت، از بخش **Artifacts** بستهٔ **HTMLToolDesk-Windows** را بگیرید. فایل `HTMLToolDesk.exe` درون آن است. اجرای workflow مستلزم فعال بودن GitHub Actions و دسترسی به مخزن است.
+پروژه را در یک مخزن GitHub آپلود کنید و در تب **Actions**، workflow با نام **Build Windows EXE** را دستی اجرا کنید. بعد از موفقیت، از بخش **Artifacts** بستهٔ **HTMLToolDesk-Fast-Windows** را بگیرید. پس از استخراج ZIP، پوشه `HTMLToolDesk` را کامل نگه دارید و EXE را از درون همان پوشه اجرا کنید. اجرای workflow مستلزم فعال بودن GitHub Actions و دسترسی به مخزن است.
 
 ## محل داده‌ها
 
-- `config.json`: کنار `HTMLToolDesk.exe` (برای اجرای سورس: کنار `main.py`) در صورتی که مسیر قابل‌نوشتن باشد.
-- اگر پوشهٔ برنامه مثل `C:\Program Files` قابل‌نوشتن نباشد، `config.json` در `%LOCALAPPDATA%\HTMLToolDesk\config.json` قرار می‌گیرد.
+- `config.json` **همیشه** در مسیر پایدار `%LOCALAPPDATA%\HTMLToolDesk\config.json` ذخیره می‌شود؛ انتخاب ابزارها پس از بستن و بازکردن برنامه حفظ خواهد شد.
+- اگر نسخه قبلی فایل `config.json` را کنار EXE ثبت کرده باشد، هنگام راه‌اندازی اول و در صورت نداشتن تنظیمات قبلی در AppData وارد می‌شود.
 - داده‌های LocalStorage / پروفایل وب: `%LOCALAPPDATA%\HTMLToolDesk\web_profile` (کش در `web_cache`).
 - فایل HTML و فایل‌های CSS، JS، تصاویر و فونت‌های وابسته به **مکان اصلی خودشان** باقی می‌مانند. برنامه فایل‌های HTML کاربر را کپی نمی‌کند؛ اگر جابه‌جا شوند باید مسیرشان را از «ویرایش» اصلاح کرد.
 - LocalStorage وابسته به origin هر فایل است. جابه‌جایی فایل به مسیر متفاوت، ممکن است داده‌های ذخیره‌شدهٔ قبلی آن صفحه را در آدرس جدید در دسترس نگذارد.

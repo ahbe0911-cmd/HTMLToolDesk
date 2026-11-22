@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 import tempfile
 from datetime import datetime
@@ -21,7 +22,11 @@ def executable_directory() -> Path:
 
 def user_data_directory() -> Path:
     local = os.environ.get("LOCALAPPDATA")
-    return (Path(local) if local else Path.home() / ".local" / "share") / APP_DIRNAME
+    if local:
+        return Path(local) / APP_DIRNAME
+    if os.name == "nt":
+        return Path.home() / "AppData" / "Local" / APP_DIRNAME
+    return Path.home() / ".local" / "share" / APP_DIRNAME
 
 
 def is_writable_directory(folder: Path) -> bool:
@@ -35,19 +40,28 @@ def is_writable_directory(folder: Path) -> bool:
 
 
 def choose_config_path() -> Path:
-    portable = executable_directory() / "config.json"
-    if is_writable_directory(portable.parent):
-        return portable
-    fallback = user_data_directory()
-    fallback.mkdir(parents=True, exist_ok=True)
-    return fallback / "config.json"
+    """Use a stable user directory even when an EXE runs from a temporary ZIP folder."""
+    return user_data_directory() / "config.json"
 
 
 class Store:
     def __init__(self, path: Path | None = None) -> None:
-        self.path = path or choose_config_path()
+        self.path = Path(path) if path is not None else choose_config_path()
         self.warning = ""
+        if path is None:
+            self._migrate_legacy_portable()
         self.state = self.load()
+
+    def _migrate_legacy_portable(self) -> None:
+        """Import an older config saved next to an EXE, without overwriting AppData."""
+        old_path = executable_directory() / "config.json"
+        if self.path.exists() or not old_path.is_file() or old_path == self.path:
+            return
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(old_path, self.path)
+        except OSError as exc:
+            self.warning = f"انتقال اطلاعات نسخه قبلی انجام نشد: {exc}"
 
     def load(self) -> AppState:
         if not self.path.exists():
@@ -71,7 +85,7 @@ class Store:
                     continue
             return AppState(
                 items=items,
-                theme=content.get("theme") if content.get("theme") in ("dark", "light") else "dark",
+                theme=content.get("theme") if content.get("theme") in ("dark", "light") else "light",
                 sidebar_width=max(240, min(520, int(content.get("sidebar_width", 320)))),
             )
         except (OSError, ValueError, TypeError, OverflowError) as exc:

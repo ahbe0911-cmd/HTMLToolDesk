@@ -1,12 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Run on Windows from the project root: pyinstaller --clean --noconfirm HTMLToolDesk.spec
-
+# Fast, one-directory build. Keep all generated files together.
 a = Analysis(
     ['main.py'],
     pathex=['.'],
     binaries=[],
     datas=[('assets', 'assets')],
-    hiddenimports=['PyQt6.QtWebEngineCore', 'PyQt6.QtWebEngineWidgets'],
+    hiddenimports=['PyQt6.QtSvg', 'PyQt6.QtWebEngineCore', 'PyQt6.QtWebEngineWidgets'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -15,16 +14,17 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.datas,
-    [],
+    pyz, a.scripts, [],
+    exclude_binaries=True,
     name='HTMLToolDesk',
+    console=False,
     debug=False,
-    bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=False,
-    disable_windowed_traceback=False,
+)
+coll = COLLECT(
+    exe, a.binaries, a.datas,
+    strip=False,
+    upx=False,
+    name='HTMLToolDesk',
 )
