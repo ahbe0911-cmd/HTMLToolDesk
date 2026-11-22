@@ -26,6 +26,11 @@ jobs:
       - name: Get font from official project
         shell: pwsh
         run: ./scripts/download_vazirmatn.ps1
+      - name: Verify real Vazirmatn font is loadable
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          python -c "from PyQt6.QtWidgets import QApplication; from html_tooldesk.theme import install_font; a=QApplication([]); family=install_font(a); print('Loaded Qt font:', family); assert 'Vazirmatn' in family, 'Vazirmatn did not load'"
       - name: Test persistence layer
         shell: pwsh
         run: python -m unittest discover -s tests -v
